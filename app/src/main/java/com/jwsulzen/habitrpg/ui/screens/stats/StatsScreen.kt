@@ -21,19 +21,29 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jwsulzen.habitrpg.data.model.SkillProgress
+import com.jwsulzen.habitrpg.data.repository.GameRepository
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.domain.RpgEngine
 import com.jwsulzen.habitrpg.ui.navigation.Screen
 import com.jwsulzen.habitrpg.ui.screens.addtask.AddTaskViewModel
 import com.jwsulzen.habitrpg.ui.screens.tasklist.TaskListViewModel
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 
 @Composable
 fun StatsScreen(
     navController: NavController,
-    viewModel: StatsViewModel = viewModel()
+    repository: GameRepository
 ) {
-    //Collect flows into Compose State
-    val playerState by viewModel.playerState.collectAsState()
+    val viewModel: StatsViewModel = viewModel(
+        factory = StatsViewModel.provideFactory(repository)
+    )
+
+    val playerState by viewModel.playerState.collectAsState(
+        initial = com.jwsulzen.habitrpg.data.model.PlayerState(emptyMap())
+    )
     val level by viewModel.globalLevel.collectAsState(initial = 1)
 
     Column (modifier = Modifier.padding(16.dp)) {
@@ -42,10 +52,29 @@ fun StatsScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        LazyColumn {
+        LazyColumn (
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             items(playerState.skills.values.toList()) { skillProgress ->
                 SkillStatRow(skillProgress)
             }
+        }
+
+        //DANGER ZONE
+        //TODO add danger zone area with multi-confirmation protection against accidentally deleting data
+        //TODO upon reset and having no data the stats seems to display a set 3 categories?
+        Spacer(Modifier.weight(1f)) //push button to bottom
+        Button(
+            onClick = { viewModel.onResetData() },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Reset All Data")
         }
     }
 }

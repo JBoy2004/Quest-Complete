@@ -22,13 +22,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.jwsulzen.habitrpg.data.repository.GameRepository
 import com.jwsulzen.habitrpg.ui.screens.addtask.AddTaskScreen
 import com.jwsulzen.habitrpg.ui.screens.tasklist.TaskListScreen
 import com.jwsulzen.habitrpg.ui.screens.stats.StatsScreen
 
 
 @Composable
-fun Navigation(modifier: Modifier = Modifier) {
+fun Navigation(repository: GameRepository) {
     val navController = rememberNavController()
 
     // This helps us track which screen is currently active
@@ -108,19 +109,19 @@ fun Navigation(modifier: Modifier = Modifier) {
                     enterTransition =  { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right) },
                     exitTransition =  { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left) }
                     ) {
-                    TaskListScreen(navController = navController)
+                    TaskListScreen(navController = navController, repository = repository) //pass repository to the screen for viewmodel
                 }
                 //STATS SCREEN
                 composable(
-                    route = Screen.AddTaskScreen.route,
+                    route = Screen.StatsScreen.route,
                     enterTransition =  { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left) },
                     exitTransition =  { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right) }
                 ) {
-                    AddTaskScreen(navController = navController)
+                    StatsScreen(navController = navController, repository = repository)
                 }
                 //ADD TASK SCREEN (slide up/down)
                 composable(
-                    route = Screen.StatsScreen.route,
+                    route = Screen.AddTaskScreen.route,
                     enterTransition = {
                         slideIntoContainer(
                             towards = AnimatedContentTransitionScope.SlideDirection.Up//,
@@ -134,7 +135,7 @@ fun Navigation(modifier: Modifier = Modifier) {
                         )
                     }
                     ) {
-                    StatsScreen(navController = navController)
+                    AddTaskScreen(navController = navController, repository = repository)
                 }
             }
         }

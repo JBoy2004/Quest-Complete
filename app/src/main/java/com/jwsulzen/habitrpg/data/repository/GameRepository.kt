@@ -1,8 +1,9 @@
 package com.jwsulzen.habitrpg.data.repository
 
-//TODO: split into TaskRepository, PlayerRepository, SkillRepository
+//TODO: split into TaskRepository, PlayerRepository, SkillRepository?
 
 import android.os.Build
+import com.jwsulzen.habitrpg.data.local.TaskDao
 import com.jwsulzen.habitrpg.data.model.*
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.data.seed.DefaultTasks
@@ -15,29 +16,27 @@ import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.util.UUID
 
-object GameRepository {
-    //Tasks State
+class GameRepository(private val taskDao: TaskDao) {
+    //STORE IN MEMORY (Static Data)
     private val _tasksSuggestedList = MutableStateFlow(DefaultTasks.tasks)
     val tasksSuggestedList = _tasksSuggestedList.asStateFlow()
-
-    private val _tasksCurrentList = MutableStateFlow(DefaultTasks.tasks) //TODO different default tasks customized from introduction
-    val tasksCurrentList = _tasksCurrentList.asStateFlow()
-
-    //Skills State
     private val _skills = MutableStateFlow(DefaultSkills.skills)
     val skills = _skills.asStateFlow()
 
-    //Player Progress State (Map)
-    private val initialProgress = DefaultSkills.skills.associate { skill ->
-        skill.id to SkillProgress(
-            skillId = skill.id,
-            xp = 0,
-            level = 1/*,
-            lastCompletedAt = LocalDate.now()*/
-        )
+    //STORE IN DATABASE (Dynamic Data)
+    val tasksCurrentList: Flow<List<Task>> = taskDao.getAllTasks()
+
+    val playerState: Flow<PlayerState> = taskDao.getSkillProgress().map { list ->
+        //convert list from database into map
+        val skillMap = list.associateBy { it.skillId }
+
+        //If db is empty initialize from hardcoded defaults (0 xp, lvl 1)
+        if (skillMap.isEmpty()) {
+            PlayerState(skills = DefaultSkills.skills.associate { it.id to SkillProgress(it.id, 0, 1) })
+        } else {
+            PlayerState(skills = skillMap)
+        }
     }
-    private val _playerState = MutableStateFlow(PlayerState(skills = initialProgress))
-    val playerState = _playerState.asStateFlow()
 
     //Level State
     val totalXp: Flow<Int> = playerState.map { state ->
@@ -54,49 +53,33 @@ object GameRepository {
 
     // ---------------------- ACTIONS ----------------------
 
-    fun completeTask(task: Task) {
+    suspend fun completeTask(task: Task) {
         //1. Add to history
         val record = CompletionRecord(taskId = task.id)
         _completionHistory.update {it + record}
 
         //2. Update Skill Progress
-        _playerState.update { currentState ->
-            val currentProgress = currentState.skills[task.skillId] //try to find skill
-                ?: SkillProgress(task.skillId, 0, 1/*, LocalDate.now()*/) //if skill not found, set progress to 0 for it(?)
+        val progressList = taskDao.getSkillProgressAsList()
+        val currentProgress = progressList.find { it.skillId == task.skillId }
+            ?: SkillProgress(task.skillId, 0, 1) //if it doesn't exist, start at lvl 1, 0 xp
 
-            val newXp = currentProgress.xp + task.difficulty.baseXp //TODO could move this into RpgEngine to make more robust xp gain system (with multipliers, etc.)
+        val newXp = currentProgress.xp + task.difficulty.baseXp
+        val newLevel = RpgEngine.getLevelFromTotalXp(newXp)
 
-            //Determine level for this specific skill based on its new xp
-            val newLevel = RpgEngine.getLevelFromTotalXp(newXp)
+        val updatedProgress = currentProgress.copy(
+            xp = newXp,
+            level = newLevel
+        )
 
-            //Create the updated progress object
-            val updatedProgress = currentProgress.copy(
-                xp = newXp,
-                level = newLevel
-                /*lastCompletedAt = LocalDate.now()*/
-            )
+        taskDao.updateSkillProgress(updatedProgress)
 
-            //Return new PlayerState with the updated Map
-            currentState.copy(
-                skills = currentState.skills + (task.skillId to updatedProgress)
-            )
-        }
-
-        //3. Remove from the current active list
-        _tasksCurrentList.update { list ->
-            list.filterNot { it.id == task.id }
-        }
+        //3. Remove from db
+        taskDao.deleteTask(task)
     }
 
-    fun createTask(
-        title: String,
-        description: String,
-        skillId: String,
-        difficulty: Difficulty/*,
-        schedule: Schedule*/
-    ) {
+    suspend fun createTask(title: String, description: String, skillId: String, difficulty: Difficulty/*,schedule: Schedule*/) {
         val newTask = Task(
-            id = UUID.randomUUID().toString(), //random string for custom tasks, is this necessary? users will only save tasks locally
+            id = UUID.randomUUID().toString(),
             title = title,
             description = description,
             skillId = skillId,
@@ -104,17 +87,24 @@ object GameRepository {
             /*schedule = schedule,*/
             isCustom = true
         )
-        _tasksCurrentList.update { it + newTask }
+        taskDao.insertTask(newTask)
+    }
+
+    suspend fun resetGameData() {
+        taskDao.clearAllTasks()
+        taskDao.clearAllProgress()
+        _completionHistory.value = emptyList<CompletionRecord>()
     }
 
     //TODO implement scheduling and this
+    /*
     fun refreshDailyTasks() {
         val masterList = _tasksSuggestedList.value
         val dueToday = masterList.filter { task ->
-            //TODO add scheduling logic
             true
         }
 
         _tasksCurrentList.value = dueToday
     }
+    */
 }

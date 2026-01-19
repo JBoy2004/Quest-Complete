@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.jwsulzen.habitrpg.data.model.Task
+import com.jwsulzen.habitrpg.data.repository.GameRepository
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.domain.RpgEngine
 import com.jwsulzen.habitrpg.ui.navigation.Screen
@@ -30,11 +31,13 @@ import com.jwsulzen.habitrpg.ui.navigation.Screen
 @Composable
 fun TaskListScreen(
     navController: NavController,
-    viewModel: TaskListViewModel = viewModel() //"injects" the viewmodel
+    repository: GameRepository
 ) {
-    //"collect" flow of tasks and make it a Compose State
-    val tasks by viewModel.tasks.collectAsState()
+    val viewModel: TaskListViewModel = viewModel(
+        factory = TaskListViewModel.provideFactory(repository)
+    )
 
+    val tasks by viewModel.tasks.collectAsState()
     val currentLevel by viewModel.level.collectAsState(1)
     val currentTotalXp by viewModel.totalXp.collectAsState(0)
 

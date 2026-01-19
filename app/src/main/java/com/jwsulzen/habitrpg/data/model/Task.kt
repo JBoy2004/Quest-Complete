@@ -1,7 +1,11 @@
 package com.jwsulzen.habitrpg.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "tasks")
 data class Task(
-    val id: String,
+    @PrimaryKey val id: String,
     val title: String,
     val description: String?,
     val skillId: String,

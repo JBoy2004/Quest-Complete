@@ -48,14 +48,18 @@ import com.jwsulzen.habitrpg.ui.screens.tasklist.TaskListViewModel
 import com.jwsulzen.habitrpg.data.model.Difficulty
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.R
+import com.jwsulzen.habitrpg.data.repository.GameRepository
 import java.time.format.TextStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskScreen(
     navController: NavController,
-    viewModel: AddTaskViewModel = viewModel()
+    repository: GameRepository
 ) {
+    val viewModel: AddTaskViewModel = viewModel(
+        factory = AddTaskViewModel.provideFactory(repository)
+    )
     Column(
         modifier = Modifier
             .fillMaxSize()
