@@ -1,5 +1,6 @@
 package com.jwsulzen.habitrpg.ui.screens.addtask
 
+import android.R.attr.shape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -20,6 +22,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -35,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color.Companion.Transparent
+import androidx.compose.ui.layout.ModifierLocalBeyondBoundsLayout
 import androidx.compose.ui.modifier.modifierLocalOf
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +64,13 @@ fun AddTaskScreen(
     val viewModel: AddTaskViewModel = viewModel(
         factory = AddTaskViewModel.provideFactory(repository)
     )
+   var selectedDate by remember { mutableStateOf(java.time.LocalDate.now()) }
+    var repeatType by remember { mutableStateOf("Does not repeat") }
+    var showRepeatMenu by remember { mutableStateOf(false) }
+
+    var repeatOptions = listOf("Does not repeat", "Every day", "Every week", "Every month", "Custom")
+    var intervalValue by remember { mutableStateOf("1") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -193,20 +204,107 @@ fun AddTaskScreen(
 
                 //TODO add scheduling information (do this later when working on scheduling logic)
                 //region SCHEDULING SELECTION
+                Text(
+                    text = "Schedule",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    //DATE SELECTION (simplified for now)
+                    OutlinedButton(
+                        onClick = { /* TODO Show DatePickerDialog */},
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(painterResource(id = android.R.drawable.ic_menu_my_calendar), contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(selectedDate.toString())
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    //REPEAT SECTION
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { showRepeatMenu = true },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(painterResource(id = android.R.drawable.stat_notify_sync), contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(text = repeatType, maxLines = 1)
+                        }
+
+                        //Dropdown Menu for Repeat options
+                        DropdownMenu(
+                            expanded = showRepeatMenu,
+                            onDismissRequest = { showRepeatMenu = false }
+                        ) {
+                            repeatOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        repeatType = option
+                                        showRepeatMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                //CUSTOM INTERVAL SUB-MENU
+                if (repeatType == "Custom") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        Text("Every ", style = MaterialTheme.typography.bodyMedium)
+                        OutlinedTextField(
+                            value = intervalValue,
+                            onValueChange = { if (it.all { char -> char.isDigit() }) intervalValue = it },
+                            modifier = Modifier.width(60.dp),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Text(" days", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
                 //endregion
 
                 //TODO add check for empty skill input (show error and prevent task creation instead of generic skill type)
                 //region CREATE TASK BUTTON
                 Button(
                     onClick = {
-                        val selectedSkill = skillOptions.find { it.name == selectedSkillName } //
+                        val selectedSkill = skillOptions.find { it.name == selectedSkillName }
+
+                        //Map UI string to Sealed Class
+                        val taskSchedule = when (repeatType) {
+                            "Every day" -> com.jwsulzen.habitrpg.data.model.Schedule.Daily
+                            "Every week" -> com.jwsulzen.habitrpg.data.model.Schedule.Weekly(setOf(selectedDate.dayOfWeek))
+                            "Every month" -> com.jwsulzen.habitrpg.data.model.Schedule.Monthly(selectedDate.dayOfMonth)
+                            "Custom" -> com.jwsulzen.habitrpg.data.model.Schedule.Interval(
+                                everyXDays = intervalValue.toIntOrNull() ?: 1,
+                                startDate = selectedDate
+                            )
+                            else -> com.jwsulzen.habitrpg.data.model.Schedule.Daily // Fallback
+                        }
+
                         viewModel.onAddTask(
                             title = title,
                             description = description,
-                            skillId = selectedSkill?.id ?: "general_id", //failsafe to go toward general, remove?
-                            difficulty = selectedDifficulty
+                            skillId = selectedSkill?.id ?: "general_id", //failsafe to go toward general
+                            difficulty = selectedDifficulty,
+                            schedule = taskSchedule
                         )
-                        navController.navigate(Screen.TasklistScreen.route) //This might break the NavBar
+                        navController.popBackStack()
                         },
                     modifier = Modifier
                         .align(Alignment.End)

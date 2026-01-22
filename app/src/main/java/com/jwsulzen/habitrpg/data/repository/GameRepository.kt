@@ -7,6 +7,7 @@ import com.jwsulzen.habitrpg.data.local.TaskDao
 import com.jwsulzen.habitrpg.data.model.*
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.data.seed.DefaultTasks
+import com.jwsulzen.habitrpg.data.model.SystemMetadata
 import com.jwsulzen.habitrpg.domain.RpgEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,17 +16,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 import java.util.UUID
+import kotlin.Boolean
 
 class GameRepository(private val taskDao: TaskDao) {
-    //STORE IN MEMORY (Static Data)
+    //------------------- DATA STREAMS -------------------
+    //STATIC: Suggested blueprints
     private val _tasksSuggestedList = MutableStateFlow(DefaultTasks.tasks)
     val tasksSuggestedList = _tasksSuggestedList.asStateFlow()
+    //STATIC: Skill definitions
     private val _skills = MutableStateFlow(DefaultSkills.skills)
     val skills = _skills.asStateFlow()
 
-    //STORE IN DATABASE (Dynamic Data)
-    val tasksCurrentList: Flow<List<Task>> = taskDao.getAllTasks()
-
+    //DYNAMIC: "Active Quest Log" from DB
+    val tasksCurrentList: Flow<List<Task>> = taskDao.getActiveTasks()
+    //DYNAMIC: Player Progress mapped from DB
     val playerState: Flow<PlayerState> = taskDao.getSkillProgress().map { list ->
         //convert list from database into map
         val skillMap = list.associateBy { it.skillId }
@@ -73,19 +77,19 @@ class GameRepository(private val taskDao: TaskDao) {
 
         taskDao.updateSkillProgress(updatedProgress)
 
-        //3. Remove from db
-        taskDao.deleteTask(task)
+        //3. Set current task to inactive
+        taskDao.updateTaskActiveStatus(task.id, false)
     }
 
-    suspend fun createTask(title: String, description: String, skillId: String, difficulty: Difficulty/*,schedule: Schedule*/) {
+    suspend fun createTask(title: String, description: String, skillId: String, difficulty: Difficulty,schedule: Schedule) {
         val newTask = Task(
             id = UUID.randomUUID().toString(),
             title = title,
             description = description,
             skillId = skillId,
             difficulty = difficulty,
-            /*schedule = schedule,*/
-            isCustom = true
+            schedule = schedule,
+            isActive = true
         )
         taskDao.insertTask(newTask)
     }
@@ -93,18 +97,30 @@ class GameRepository(private val taskDao: TaskDao) {
     suspend fun resetGameData() {
         taskDao.clearAllTasks()
         taskDao.clearAllProgress()
-        _completionHistory.value = emptyList<CompletionRecord>()
+        _completionHistory.value = emptyList()
     }
 
-    //TODO implement scheduling and this
-    /*
-    fun refreshDailyTasks() {
-        val masterList = _tasksSuggestedList.value
-        val dueToday = masterList.filter { task ->
-            true
+    suspend fun refreshDailyTasks() {
+        val today = LocalDate.now()
+
+        //1. Check DB for the last refresh date
+        val metadata = taskDao.getMetadata()
+        val lastRefreshDate = metadata?.lastRefreshDate
+
+        //2. If already refreshed today, stop
+        if (lastRefreshDate == today) return
+
+        //3. Perform Daily Reset logic
+        taskDao.deactivateAllTasks()
+
+        val allTasks = taskDao.getAllTasksAsList()
+        allTasks.forEach { task ->
+            if (task.schedule.isDue(today)) {
+                taskDao.updateTaskActiveStatus(task.id, true)
+            }
         }
 
-        _tasksCurrentList.value = dueToday
+        //4. Update DB with today's date for refreshing
+        taskDao.updateMetadata(SystemMetadata(lastRefreshDate = today))
     }
-    */
 }

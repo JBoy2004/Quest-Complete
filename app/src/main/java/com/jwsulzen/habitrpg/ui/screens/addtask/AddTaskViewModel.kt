@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jwsulzen.habitrpg.data.model.Difficulty
+import com.jwsulzen.habitrpg.data.model.Schedule
 import com.jwsulzen.habitrpg.data.model.Task
 import com.jwsulzen.habitrpg.data.repository.GameRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,7 +17,7 @@ class AddTaskViewModel(private val repository: GameRepository) : ViewModel() {
     val tasks = repository.tasksCurrentList.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList<Task>()
+        initialValue = emptyList()
     )
 
     //TODO add functions to add custom tasks and premade tasks to CurrentTaskList
@@ -24,16 +25,16 @@ class AddTaskViewModel(private val repository: GameRepository) : ViewModel() {
         title : String,
         description : String,
         skillId : String,
-        difficulty : Difficulty/*
-        schedule: Schedule*/
+        difficulty : Difficulty,
+        schedule: Schedule
     ) {
         viewModelScope.launch { //coroutine
             repository.createTask(
                 title,
                 description,
                 skillId,
-                difficulty/*,
-                schedule,*/
+                difficulty,
+                schedule
             )
         }
     }

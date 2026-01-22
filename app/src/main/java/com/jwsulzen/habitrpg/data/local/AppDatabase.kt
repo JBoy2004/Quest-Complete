@@ -2,12 +2,17 @@ package com.jwsulzen.habitrpg.data.local
 
 import android.content.Context
 import androidx.room.*
+import com.google.gson.Gson
 import com.jwsulzen.habitrpg.data.model.Difficulty
 import com.jwsulzen.habitrpg.data.model.SkillProgress
+import com.jwsulzen.habitrpg.data.model.SystemMetadata
 import com.jwsulzen.habitrpg.data.model.Task
+import java.time.LocalDate
 
-@Database(entities = [Task::class, SkillProgress::class], version = 1, exportSchema = false)
-@TypeConverters(AppConverters::class)
+@Database(entities = [Task::class, SkillProgress::class, SystemMetadata::class],
+    version = 4, //must increment version when modifying classes stored in db!
+    exportSchema = false)
+@TypeConverters(AppConverters::class, ScheduleConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
 
@@ -21,7 +26,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "habit_rpg_database"
-                ).build()
+                ).fallbackToDestructiveMigration(dropAllTables = true) //TODO IMPORTANT for full release must change this! Otherwise updates will delete all user data!!!
+                    .build()
                 INSTANCE = instance
                 instance
             }
@@ -35,4 +41,10 @@ class AppConverters {
     fun fromDifficulty(value: Difficulty) = value.name
     @TypeConverter
     fun toDifficulty(value: String) = Difficulty.valueOf(value)
+
+    @TypeConverter
+    fun fromLocalDate(date: LocalDate?): String? = date?.toString()
+    @TypeConverter
+    fun toLocalDate(dateString: String?): LocalDate? = dateString?.let { LocalDate.parse(it) }
+
 }

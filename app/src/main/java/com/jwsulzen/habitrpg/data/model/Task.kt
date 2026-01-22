@@ -10,7 +10,7 @@ data class Task(
     val description: String?,
     val skillId: String,
     val difficulty: Difficulty,
-    /*val schedule: Schedule,*/
-    /*val notification : Notification,*/ //TODO add optional notifications per task!
-    val isCustom: Boolean
+    val schedule: Schedule,
+    val isActive: Boolean = false
+    //val notification : Notification, //TODO add optional notifications per task!
 )
