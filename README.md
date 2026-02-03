@@ -6,7 +6,7 @@ HabitRPG is a gamified habit building android application.
 
 Features include:
 
-Experience gain across different categories as they complete tasks.
+Experience gain and leveling system across different categories as the user completes tasks.
 
 Custom task creation including skill category selection, goal setting, and the ability to quickly edit tasks anytime.
 
