@@ -24,10 +24,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.jwsulzen.habitrpg.data.repository.GameRepository
+import com.jwsulzen.habitrpg.ui.navigation.Screen.StatsDetailScreen
 import com.jwsulzen.habitrpg.ui.screens.tasksettings.TaskSettingsScreen
 import com.jwsulzen.habitrpg.ui.screens.selectskill.SelectSkillScreen
 import com.jwsulzen.habitrpg.ui.screens.dashboard.DashboardScreen
 import com.jwsulzen.habitrpg.ui.screens.stats.StatsScreen
+import com.jwsulzen.habitrpg.ui.screens.statsdetail.StatsDetailScreen
 
 
 @Composable
@@ -39,11 +41,12 @@ fun Navigation(repository: GameRepository) {
     val currentRoute = navBackStackEntry?.destination?.route
 
     val isAddingTask = currentRoute?.startsWith(Screen.TaskSettingsScreen.route) == true || currentRoute == Screen.SelectSkillScreen.route
+    val isViewingStats = currentRoute?.startsWith(Screen.StatsDetailScreen.route) == true
 
     //TODO add swipe gesture to navigate between TaskListView and Stats screens somehow
     Scaffold(
         bottomBar = {
-            if (!isAddingTask) { //hide bar for add task screen
+            if (!isAddingTask && !isViewingStats) { //hide bar for add task screen
                 NavigationBar {
                     // Home Button
                     NavigationBarItem(
@@ -68,7 +71,7 @@ fun Navigation(repository: GameRepository) {
                         icon = {
                             //surface/card to make diamond shape
                             androidx.compose.material3.Surface(
-                                modifier = androidx.compose.ui.Modifier.size(82.dp),
+                                modifier = androidx.compose.ui.Modifier.size(80.dp),
                                 shape = androidx.compose.foundation.shape.CutCornerShape(50), //50% cut = diamond
                                 color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                                 shadowElevation = 4.dp
@@ -110,8 +113,8 @@ fun Navigation(repository: GameRepository) {
                 //TASKLIST SCREEN
                 composable(
                     route = Screen.TasklistScreen.route,
-                    enterTransition =  { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right) },
-                    exitTransition =  { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left) }
+                    enterTransition =  { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left) },
+                    exitTransition =  { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right) }
                     ) {
                     DashboardScreen(navController = navController, repository = repository) //pass repository to the screen for viewmodel
                 }
@@ -152,6 +155,21 @@ fun Navigation(repository: GameRepository) {
                     StatsScreen(navController = navController, repository = repository)
                 }
 
+                //STATS DETAIL SCREEN
+                composable(
+                    route = StatsDetailScreen.routeWithArgs,
+                    arguments = listOf(
+                        navArgument("id") { type = NavType.StringType },
+                        navArgument("type") { type = NavType.StringType }
+                    ),
+                    enterTransition = { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Up) },
+                    exitTransition = { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Down) }
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getString("id") ?: ""
+                    val type = backStackEntry.arguments?.getString("type") ?: "skill"
+
+                    StatsDetailScreen(navController, repository, id, type)
+                }
             }
         }
     }

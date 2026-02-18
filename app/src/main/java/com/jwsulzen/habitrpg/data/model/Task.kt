@@ -3,6 +3,12 @@ package com.jwsulzen.habitrpg.data.model
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+data class NotificationSettings(
+    val hour: Int,
+    val minute: Int,
+    val daysOfWeek: Set<java.time.DayOfWeek>
+)
+
 @Entity(tableName = "tasks")
 data class Task(
     @PrimaryKey val id: String,
@@ -13,9 +19,8 @@ data class Task(
     val goal: Int = 1,
     val currentProgress: Int = 0,
     val isGoalReached: Boolean = false,
-    //MEASURABLE FIELDS
     val isMeasurable: Boolean = false,
     val unit: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
-    //val notification : Notification, //TODO add optional notifications per task!
+    val createdAt: Long = System.currentTimeMillis(),
+    val notificationSettings : NotificationSettings? = null
 )

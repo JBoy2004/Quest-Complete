@@ -66,7 +66,7 @@ fun SelectSkillScreen(
             )
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3), //Currently forcing 3 columns, change for tablets?
+            columns = GridCells.Fixed(3),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f)
@@ -83,7 +83,7 @@ fun SelectSkillScreen(
         }
     }
 
-    //Modal Bottom Sheet for selection
+    //AlertDialog for selection
     if (showSheet) {
         AlertDialog(
             onDismissRequest = { showSheet = false },
@@ -109,7 +109,7 @@ fun SelectSkillScreen(
                             navController.navigate("${Screen.TaskSettingsScreen.route}/${selectedSkill?.id}/false")
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = CutCornerShape(8.dp)
+                        shape = CutCornerShape(4.dp)
                     ) {
                         Text("Completion (e.g. Clean my room)")
                     }
@@ -121,13 +121,13 @@ fun SelectSkillScreen(
                             navController.navigate("${Screen.TaskSettingsScreen.route}/${selectedSkill?.id}/true")
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = CutCornerShape(8.dp)
+                        shape = CutCornerShape(4.dp)
                     ) {
                         Text("Measurable (e.g. Read 6 pages)")
                     }
                 }
             },
-            shape = CutCornerShape(16.dp),
+            shape = CutCornerShape(8.dp),
             confirmButton = {}
         )
     }

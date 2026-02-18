@@ -12,10 +12,10 @@ import java.time.LocalDate
 
 class DashboardViewModel(private val repository: GameRepository) : ViewModel() {
 
-    //"collect" tasks from the repository
-    //UI will "observe" this list
-    val level = repository.globalLevel //Flow<Int>
+    val globalLevel = repository.globalLevel //Flow<Int>
     val totalXp = repository.totalXp // Flow<Int>
+
+    val playerState = repository.playerState
 
 
     val tasksDaily = repository.tasksDaily

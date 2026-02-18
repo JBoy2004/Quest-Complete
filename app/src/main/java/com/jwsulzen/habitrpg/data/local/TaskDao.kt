@@ -10,12 +10,38 @@ import java.time.LocalDate
 
 @Dao
 interface TaskDao {
+
+    //Date pulling stuff
+    @Query("""
+        SELECT DISTINCT date FROM completion_history
+        WHERE
+            (:filterId = 'Overall') -- Overall
+            OR
+            (taskId = :filterId) -- Specific Task ID
+            OR
+            (taskId IN (SELECT id FROM tasks WHERE skillId = :filterId)) -- Skill ID passed as 'All'
+        AND date >= :startDate
+    """)
+    suspend fun getActivityDates(filterId: String, startDate: LocalDate): List<LocalDate>
+
+    @Query("""
+        SELECT * FROM completion_history
+        WHERE
+            (:filterId = 'Overall')
+            OR
+            (taskId = :filterId)
+            OR
+            (taskId IN (SELECT id FROM tasks WHERE skillId = :filterId))
+        ORDER BY date DESC
+        """)
+    fun getHistoryForFilter(filterId: String): Flow<List<CompletionRecord>>
+
     //region HISTORY (CompletionRecord)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCompletionRecord(record: CompletionRecord)
 
-    @Query("SELECT * FROM completion_history WHERE taskId = :taskId")
-    fun getHistoryForTask(taskId: String): Flow<List<CompletionRecord>>
+    @Query("SELECT * FROM completion_history WHERE taskId = :taskId AND date = :date LIMIT 1")
+    suspend fun getCompletionRecord(taskId: String, date: LocalDate): CompletionRecord?
 
     @Query("SELECT DISTINCT date FROM completion_history WHERE taskId = :taskId AND progressAmount > 0")
     suspend fun getDatesWithProgress(taskId: String): List<LocalDate>
@@ -61,7 +87,7 @@ interface TaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: Task)
 
-    //Deleting tasks TODO: replace with task archive functionality!
+    //Deleting tasks TODO: add task archive functionality!
     @Delete
     suspend fun deleteTask(task: Task)
 

@@ -1,47 +1,110 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.jwsulzen.habitrpg.ui.screens.dashboard
 
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
-import androidx.compose.runtime.SideEffect
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.forEach
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.setFrom
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.toPath
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.jwsulzen.habitrpg.R
 import com.jwsulzen.habitrpg.data.model.Task
 import com.jwsulzen.habitrpg.data.repository.GameRepository
 import com.jwsulzen.habitrpg.data.seed.DefaultSkills
 import com.jwsulzen.habitrpg.domain.RpgEngine
 import com.jwsulzen.habitrpg.ui.navigation.Screen
+import java.time.LocalDate
+import kotlin.collections.emptySet
 
 @Composable
 fun DashboardScreen(
@@ -51,14 +114,18 @@ fun DashboardScreen(
     val viewModel: DashboardViewModel = viewModel(
         factory = DashboardViewModel.provideFactory(repository)
     )
-
     val tasksDaily by viewModel.tasksDaily.collectAsState()
     val tasksWeekly by viewModel.tasksWeekly.collectAsState()
     val tasksMonthly by viewModel.tasksMonthly.collectAsState()
 
-
-    val currentLevel by viewModel.level.collectAsState(1)
+    val playerState by viewModel.playerState.collectAsState(
+        initial = com.jwsulzen.habitrpg.data.model.PlayerState(emptyMap())
+    )
+    val playerLevel by viewModel.globalLevel.collectAsState(initial = 1)
     val currentTotalXp by viewModel.totalXp.collectAsState(0)
+    val levelProgress = RpgEngine.getLevelProgress(currentTotalXp)
+    val xpIntoLevel = RpgEngine.getXpIntoLevel(currentTotalXp)
+    val xpRequiredForLevel = RpgEngine.getXpRequiredForLevel(playerLevel)
 
     var selectedTaskForDialog by remember { mutableStateOf<Task?>(null) }
 
@@ -67,77 +134,134 @@ fun DashboardScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        //PLAYER INFO
+        //region PLAYER INFORMATION
         Card(
-            shape = CutCornerShape(10),
+            //colors = CardDefaults.cardColors(containerColor = Color(0xFFF1E9D2)),
+            shape = CutCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
+                .border(2.dp, Color.Black.copy(alpha = 0.5f), CutCornerShape(12.dp))
+                .clickable { /* TODO navController.navigate(Screen.StatsScreen.route) */ } //yea this breaks the navbar, fix it by popping stack?
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                //LEVEL DISPLAY
-                Card(
-                    shape = CutCornerShape(0),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                    modifier = Modifier.size(60.dp) //fixed size for level box
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(text = "LVL", style = MaterialTheme.typography.labelSmall)
-                            Text(
-                                text = currentLevel.toString(),
-                                style = MaterialTheme.typography.headlineMedium,
-                            )
-                        }
+                    //region PROFILE PICTURE
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .border(2.dp, Color.Black),
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.default_user_icon), //TODO allow user to upload their own
+                            contentDescription = null
+                        )
                     }
-                }
+                    //endregion
 
-                Spacer(modifier = Modifier.width(16.dp))
+                    //region LEVEL DISPLAY
+                    Box(
+                        modifier = Modifier
+                            .drawWithCache {
+                                //Define hexagon
+                                val hexagon = RoundedPolygon(
+                                    numVertices = 6,
+                                    radius = size.minDimension / 2,
+                                    centerX = size.width / 2,
+                                    centerY = size.height / 2
+                                )
 
-                //NAME AND XP BAR
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "John Doe", //TODO add input for player name
-                        style = MaterialTheme.typography.titleLarge
-                    )
+                                //Matrix to rotate 90 degrees
+                                val matrix = android.graphics.Matrix().apply {
+                                    postRotate(90f, size.width / 2, size.height / 2)
+                                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                                val hexagonPath = hexagon.toPath().asComposePath()
+                                val composeMatrix = androidx.compose.ui.graphics.Matrix()
+                                composeMatrix.setFrom(matrix)
 
-                    //XP BAR
-                    val progress = RpgEngine.getLevelProgress(currentTotalXp)
-                    val xpIntoLevel = RpgEngine.getXpIntoLevel(currentTotalXp)
-                    val xpRequiredForLevel = RpgEngine.getXpRequiredForLevel(currentLevel)
+                                hexagonPath.transform(composeMatrix)
 
-                    Column {
+                                onDrawBehind {
+                                    //DRAW FILL (Background)
+                                    drawPath(
+                                        hexagonPath,
+                                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color(0xFF4D0308),
+                                                Color(0xFFE61515)
+                                            ) //TODO store preset level colors and pull them based on level here
+                                        )
+                                    )
+
+                                    //DRAW BORDER (Outline)
+                                    drawPath(
+                                        path = hexagonPath,
+                                        color = Color.Black,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                            width = 4.dp.toPx()
+                                        )
+                                    )
+                                }
+                            }
+                            .size(70.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = playerLevel.toString(),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    //endregion
+
+                    //region XP BAR
+                    //TODO make more bootylicious
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .border(2.dp, Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { levelProgress },
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(12.dp),
-                            strokeCap = StrokeCap.Butt, //sharp edges(?)
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                .fillMaxSize(),
+                            strokeCap = StrokeCap.Butt,
+                            color = Color(0xFFE61515),
+                            trackColor = Color.White,
+                            gapSize = 0.dp,
                             drawStopIndicator = {}
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Text(
-                                text = "$xpIntoLevel / $xpRequiredForLevel XP",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
+                        Text(
+                            text = "$xpIntoLevel / $xpRequiredForLevel XP",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.Black, // Black text stands out against red/white
+                            fontWeight = FontWeight.Bold
+                        )
                     }
+                    //endregion
                 }
+
+                //PLAYER NAME
+                Text(
+                    text = "Gandalf the Gray", //TODO add input for player name
+                    style = MaterialTheme.typography.titleLarge
+                )
             }
         }
+        //endregion
 
         //TITLE (Current Quests)
         Text(
@@ -145,7 +269,7 @@ fun DashboardScreen(
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier
-                .padding(bottom = 16.dp)
+                .padding(vertical = 12.dp)
                 .fillMaxWidth()
         )
 
@@ -208,8 +332,6 @@ fun DashboardScreen(
                 }
             }
         }
-
-
 
         selectedTaskForDialog?.let { task ->
             ProgressInputDialog(
@@ -355,7 +477,10 @@ fun TaskItem(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape),
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                shape = CircleShape
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(text = skillEmoji, fontSize = 30.sp)
@@ -367,18 +492,11 @@ fun TaskItem(
                     Column (modifier = Modifier.weight(1f)) {
                         Text(text = task.title, style = MaterialTheme.typography.titleLarge)
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = task.difficulty.name,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                            Text(
-                                text = "  +${task.difficulty.baseXp} XP",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                        Text(
+                            text = task.difficulty.name.lowercase().replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
                     }
                     //PROGRESS DISPLAY (e.g. 1/3)
                     Text(
@@ -413,7 +531,7 @@ fun TaskItem(
                 }
 
                 LinearProgressIndicator(
-                    progress = { task.currentProgress.toFloat()/task.goal.toFloat() },
+                    progress = { progressFraction },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(10.dp),
@@ -430,7 +548,6 @@ fun TaskItem(
 
 enum class DragValue { Left, Center, Right }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressInputDialog(
     task: Task,
@@ -448,6 +565,12 @@ fun ProgressInputDialog(
     var currentProgressPlaceholder by remember { mutableStateOf("0")}
 
     var activityDates by remember { mutableStateOf<List<java.time.LocalDate>>(emptyList()) }
+
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     LaunchedEffect(task.id) {
         activityDates = repository.getDatesWithProgress(task.id)
@@ -516,17 +639,22 @@ fun ProgressInputDialog(
                         modifier = Modifier.height(IntrinsicSize.Min)
                         ) {
                         OutlinedTextField(
-                            value = inputText,
-                            onValueChange = { if (it.all { char -> char.isDigit() }) inputText = it },
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight(),
+                                .fillMaxHeight()
+                                .focusRequester(focusRequester),
+                            value = inputText,
+                            onValueChange = { if (it.all { char -> char.isDigit() }) inputText = it },
                             placeholder = { Text(currentProgressPlaceholder) },
                             singleLine = true,
                             trailingIcon = {
                                 val unitText = if (!task.unit.isNullOrBlank()) task.unit else "times"
                                 Text(unitText, modifier = Modifier.padding(end = 8.dp))
-                            }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Done
+                            )
                         )
 
                         Spacer(Modifier.width(8.dp))
@@ -569,7 +697,11 @@ fun ProgressInputDialog(
                                 "$unitText/$periodLabel",
                                 modifier = Modifier.padding(end = 8.dp)
                             )
-                        }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        )
                     )
                 }
 

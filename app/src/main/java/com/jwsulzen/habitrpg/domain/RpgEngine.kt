@@ -5,20 +5,15 @@ import kotlin.math.pow
 object RpgEngine {
     //TWEAK NUMBERS TO ADJUST PROGRESSION SPEED
     //TODO Overall level and skill levels share the same equation right now-- make overall level more exponential?
-    private const val BASE_XP = 100
-    private const val SCALING_FACTOR = 1.5
+    private const val BASE_XP = 80
+    private const val SCALING_FACTOR = 1.05
+    private const val SCALING_FLAT = 10
 
-    /**
-     * Total XP required to reach the START of a specific level.
-     * Level 1: 0 XP
-     * Level 2: 100 XP
-     * Level 3: 250 XP (100 + 150)
-     */
     fun getTotalXpForLevel(level: Int): Int {
         if (level <= 1) return 0
         var total = 0
         for (i in 1 until level) {
-            total += (BASE_XP * SCALING_FACTOR.pow((i - 1).toDouble())).toInt()
+            total += (BASE_XP * SCALING_FACTOR.pow((i - 1).toDouble())).toInt() + SCALING_FLAT*(i - 1)
         }
         return total
     }

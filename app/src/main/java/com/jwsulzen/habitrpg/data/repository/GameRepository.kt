@@ -57,7 +57,7 @@ class GameRepository(private val taskDao: TaskDao) {
 
     // ---------------------- ACTIONS ----------------------
 
-    suspend fun createTask(title: String, skillId: String, difficulty: Difficulty,schedule: Schedule, goal: Int, unit: String, isMeasurable: Boolean) {
+    suspend fun createTask(title: String, skillId: String, difficulty: Difficulty,schedule: Schedule, goal: Int, unit: String, isMeasurable: Boolean, notificationSettings : NotificationSettings? = null): Task {
         val newTask = Task(
             id = UUID.randomUUID().toString(),
             title = title,
@@ -68,61 +68,79 @@ class GameRepository(private val taskDao: TaskDao) {
             currentProgress = 0,
             isGoalReached = false,
             unit = unit,
-            isMeasurable = isMeasurable
+            isMeasurable = isMeasurable,
+            notificationSettings = notificationSettings
         )
         taskDao.insertTask(newTask)
+        return newTask
     }
 
-    private fun getPeriodStart(schedule: Schedule, today: LocalDate): LocalDate {
+    private fun getPeriodStart(schedule: Schedule, date: LocalDate): LocalDate {
         return when (schedule) {
-            is Schedule.Daily -> today
-            is Schedule.Weekly -> today.with(java.time.DayOfWeek.MONDAY) //TODO User setting for Sun/Mon
-            is Schedule.Monthly -> today.withDayOfMonth(1)
-            is Schedule.Interval -> today //TODO (low priority) add custom logic later
+            is Schedule.Daily -> date
+            is Schedule.Weekly -> date.with(java.time.DayOfWeek.MONDAY) //TODO User setting for Sun/Mon
+            is Schedule.Monthly -> date.withDayOfMonth(1)
+            is Schedule.Interval -> date //TODO (low priority) add custom logic later
         }
     }
 
     suspend fun logTaskProgress(task: Task, amount: Int, date: LocalDate, newGoal: Int) {
         val today = LocalDate.now()
 
-        //Insert the history record
+        //Get existing record to see how much XP was saved
+        val existingRecord = taskDao.getCompletionRecord(task.id, date)
+        val oldXpGained = existingRecord?.xpGained ?: 0
+
+        //Calculate XP pools
+        val progressXpPool = task.difficulty.baseXp
+        val completionBonusPool = when (task.schedule) {
+            is Schedule.Daily -> (task.difficulty.baseXp / 2f).toInt()
+            is Schedule.Weekly -> task.difficulty.baseXp
+            is Schedule.Monthly -> (task.difficulty.baseXp * 1.25f).toInt()
+            else -> (task.difficulty.baseXp / 2f).toInt()
+        }
+
+        //Calculate how much Progress XP to award/subtract
+        val progressRatio = (amount.toFloat() / newGoal.toFloat())
+        val currentProgressXp = (progressRatio * progressXpPool).toInt()
+
+        //Determine if goal is reached ON THAT DATE
+        val periodStart = getPeriodStart(task.schedule, date)
+        val otherDaysProgress = (taskDao.getProgressSumForRange(task.id, periodStart, today) ?: 0) - (existingRecord?.progressAmount ?: 0)
+        val totalProgressWithNewAmount = otherDaysProgress + amount
+
+        val isGoalMet = totalProgressWithNewAmount >= newGoal
+        val finalRecordXp = if (isGoalMet) currentProgressXp + completionBonusPool else currentProgressXp
+
+        //Calculate Delta and update Skill
+        val xpDelta = finalRecordXp - oldXpGained
+        updateSkillXp(task.skillId, xpDelta)
+
+        //Save the record with updated xpGained
         val record = CompletionRecord(
             taskId = task.id,
             date = date,
-            xpGained = 0,
+            xpGained = finalRecordXp,
             progressAmount = amount
         )
         taskDao.insertCompletionRecord(record) //overwrite the previous data
 
         //Update Goal in DB if it changed
-        if (newGoal != task.goal) {
+        val currentPeriodStart = getPeriodStart(task.schedule, today)
+        val isDateInCurrentPeriod = !date.isBefore(currentPeriodStart) && !date.isAfter(today)
+        if (isDateInCurrentPeriod) {
+            val currentTotal = taskDao.getProgressSumForRange(task.id, currentPeriodStart, today) ?: 0
+
+            val updatedTask = task.copy(
+                goal = newGoal,
+                currentProgress = currentTotal,
+                isGoalReached = currentTotal >= newGoal
+            )
+            taskDao.insertTask(updatedTask)
+        } else if (newGoal != task.goal) {
+            //If edited historical date but also changed the goal
             taskDao.updateTaskGoal(task.id, newGoal)
         }
-
-        //RECALCULATE CACHED PROGRESS
-        //Calculate progress based on current period (today/this week/this month)
-        val periodStart = getPeriodStart(task.schedule, today)
-        val totalForPeriod = taskDao.getProgressSumForRange(task.id, periodStart, today) ?: 0
-
-        //XP LOGIC
-        val reachedGoalNow = totalForPeriod >= newGoal
-        val wasGoalReachedBefore = task.isGoalReached
-
-        if (!wasGoalReachedBefore && reachedGoalNow) {
-            //Award XP
-            updateSkillXp(task.skillId, task.difficulty.baseXp)
-        } else if (wasGoalReachedBefore && !reachedGoalNow) {
-            //Remove XP
-            updateSkillXp(task.skillId, -task.difficulty.baseXp)
-        }
-
-        //Update Task Entity so the Dashboard UI updates
-        val updatedTask = task.copy(
-            goal = newGoal,
-            currentProgress = totalForPeriod,
-            isGoalReached = totalForPeriod >= newGoal
-        )
-        taskDao.insertTask(updatedTask)
     }
 
     private suspend fun updateSkillXp(skillId: String, xpGain: Int) {
@@ -164,6 +182,19 @@ class GameRepository(private val taskDao: TaskDao) {
         return taskDao.getTaskById(id)
     }
 
+    suspend fun deleteTask(task: Task) {
+        taskDao.deleteTask(task)
+    }
+
+    fun getHistoryForFilter(filterId: String): Flow<List<CompletionRecord>> {
+        return taskDao.getHistoryForFilter(filterId)
+    }
+
+    suspend fun getActivityDates(skillId: String, daysBack: Long): List <LocalDate> {
+        val startDate = LocalDate.now().minusDays(daysBack)
+        return taskDao.getActivityDates(skillId, startDate)
+    }
+
     suspend fun resetGameData() {
         taskDao.clearAllTasks()
         taskDao.clearAllProgress()
@@ -189,7 +220,7 @@ class GameRepository(private val taskDao: TaskDao) {
                     //TODO allow user to set start of week to Sunday or Monday
                     val lastWeek = lastRefreshDate.with(java.time.DayOfWeek.MONDAY)
                     val currentWeek = today.with(java.time.DayOfWeek.MONDAY)
-                    currentWeek.isAfter(lastWeek)
+                    currentWeek != lastWeek
                 }
                 is Schedule.Monthly -> {
                     //Reset if today is a new month

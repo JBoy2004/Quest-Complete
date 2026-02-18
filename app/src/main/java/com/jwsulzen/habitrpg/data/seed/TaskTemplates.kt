@@ -29,7 +29,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Writing
@@ -55,7 +55,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Art
@@ -81,7 +81,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Programming
@@ -107,7 +107,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Fitness
@@ -133,7 +133,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Studying
@@ -159,7 +159,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Language Learning
@@ -185,7 +185,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Sleep
@@ -211,7 +211,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
         //region Hygiene
@@ -237,7 +237,7 @@ object TaskTemplates {
             currentProgress = 0,
             isGoalReached = false,
             isMeasurable = false,
-            unit = ""
+            unit = "times"
         ),
         //endregion
     )

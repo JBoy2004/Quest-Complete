@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.jwsulzen.habitrpg.data.repository.GameRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class StatsViewModel(private val repository: GameRepository) : ViewModel() {
@@ -21,6 +23,13 @@ class StatsViewModel(private val repository: GameRepository) : ViewModel() {
             }
         }
     }
+
+    val allTasks = repository.tasksCurrentList
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
 
     fun onResetData() {
         viewModelScope.launch {
